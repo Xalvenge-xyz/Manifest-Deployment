@@ -414,7 +414,7 @@ def create_gamesetup_command(monitor: GameMonitor):
                     options=feature_options
                 )
 
-            async def callback(self, feature_interaction: discord.Interaction):
+            async def callback(self, current_interaction: discord.Interaction):
                 feature = self.values[0]
 
                 class ChannelSelect(ui.Select):
@@ -446,8 +446,8 @@ def create_gamesetup_command(monitor: GameMonitor):
                 view2 = ui.View()
                 view2.add_item(ChannelSelect())
 
-                # MUST use followup.send because original interaction is deferred
-                await feature_interaction.followup.send(
+                # MUST use response.send_message here, using the correct interaction
+                await current_interaction.response.send_message(
                     f"📌 Now select the channel for **{feature} alerts**:",
                     view=view2,
                     ephemeral=True
@@ -468,6 +468,7 @@ def create_gamesetup_command(monitor: GameMonitor):
         description="Configure channels for new/updated/fixed game alerts (Owner Only)",
         callback=gamesetup
     )
+
 
 
 def create_testgamealerts_command(monitor: GameMonitor):
