@@ -587,29 +587,39 @@ def create_updategame_command(monitor: GameMonitor):
     async def updategame(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
-        games = await monitor.fetch_games()
-        if not games:
-            await interaction.followup.send("❌ Failed to load game list.", ephemeral=True)
-            return
+        async def send_updates():
+            games = await monitor.fetch_games()
+            if not games:
+                await interaction.followup.send("❌ Failed to load game list.", ephemeral=True)
+                return
 
-        results = []
-        for g in games:
-            name = (g.get("title") or g.get("name") or "").strip()
-            appid = str(g.get("appid") or g.get("id") or "N/A")
-            img = g.get("img") or g.get("image") or g.get("header_image") or None
+            results = []
+            for g in games:
+                name = (g.get("title") or g.get("name") or "").strip()
+                appid = str(g.get("appid") or g.get("id") or "N/A")
+                img = g.get("img") or g.get("image") or g.get("header_image") or None
 
-            if name not in monitor.seen_update:
-                results.append((name, appid, img))
+                if name not in monitor.seen_update:
+                    results.append((name, appid, img))
 
-        if not results:
-            await interaction.followup.send("⚠ No UPDATED games found.", ephemeral=True)
-            return
+            if not results:
+                await interaction.followup.send("⚠ No UPDATED games found.", ephemeral=True)
+                return
 
-        for name, appid, img in results[:10]:
-            embed = monitor.make_game_embed(name, appid, img, "UPDATED")
-            await interaction.followup.send(embed=embed)
+            # Send first 10 updated games as embeds
+            for name, appid, img in results[:10]:
+                embed = monitor.make_game_embed(name, appid, img, "UPDATED")
+                await interaction.followup.send(embed=embed)
 
-    return app_commands.Command(name="updategame", description="Show updated games (manual, does not affect alerts)", callback=updategame)
+        # Run in background to avoid interaction timing out
+        asyncio.create_task(send_updates())
+
+    return app_commands.Command(
+        name="updategame",
+        description="Show updated games (manual, does not affect alerts)",
+        callback=updategame
+    )
+
 
 
 def create_fixegame_command(monitor: GameMonitor):
@@ -628,14 +638,12 @@ def create_fixegame_command(monitor: GameMonitor):
 
         # send ALL fixes with professional embed
         for f in fixes:
-            # Pass the banner file to the embed so it appears inside
             embed = monitor.make_fix_embed(
                 f.get("title"),
                 f.get("download"),
                 f.get("size", ""),
-                image=default_banner  # <-- pass the file here
+                image=default_banner
             )
-            # Send embed with the same file attached
             await monitor.safe_send(
                 monitor.config.get("channel_id_fixed"),
                 embed,
