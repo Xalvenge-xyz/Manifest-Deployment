@@ -384,17 +384,11 @@ class GameMonitor:
 def create_gamesetup_command(monitor: GameMonitor):
     async def gamesetup(interaction: discord.Interaction):
         if interaction.user.id != interaction.guild.owner_id:
-            await interaction.response.send_message(
-                "❌ Only the server owner can use this command.",
-                ephemeral=True
-            )
+            await interaction.response.send_message("❌ Only the server owner can use this command.", ephemeral=True)
             return
 
         channels = interaction.guild.text_channels[:25]
-        options = [
-            discord.SelectOption(label=c.name, value=str(c.id))
-            for c in channels
-        ]
+        options = [discord.SelectOption(label=c.name, value=str(c.id)) for c in channels]
 
         feature_options = [
             discord.SelectOption(label="New Games", value="new"),
@@ -404,53 +398,35 @@ def create_gamesetup_command(monitor: GameMonitor):
 
         class FeatureSelect(ui.Select):
             def __init__(self):
-                super().__init__(
-                    placeholder="Select feature to configure",
-                    min_values=1,
-                    max_values=1,
-                    options=feature_options
-                )
+                super().__init__(placeholder="Select feature to configure", min_values=1, max_values=1, options=feature_options)
 
             async def callback(self, feature_interaction: discord.Interaction):
                 feature = self.values[0]
 
                 class ChannelSelect(ui.Select):
                     def __init__(self):
-                        super().__init__(
-                            placeholder=f"Select channel for {feature} alerts",
-                            min_values=1,
-                            max_values=1,
-                            options=options
-                        )
+                        super().__init__(placeholder=f"Select channel for {feature} alerts", min_values=1, max_values=1, options=options)
 
                     async def callback(self, select_interaction: discord.Interaction):
                         selected_channel = int(self.values[0])
-
                         if feature == "new":
                             monitor.config["channel_id_new"] = selected_channel
                         elif feature == "update":
                             monitor.config["channel_id_update"] = selected_channel
                         elif feature == "fixed":
                             monitor.config["channel_id_fixed"] = selected_channel
-
                         monitor.save_config()
-
-                        # DEFER first (acknowledge) before editing
-                        await select_interaction.response.defer(ephemeral=True)
-                        await select_interaction.edit_original_message(
-                            content=f"✅ Channel for **{feature} games** set to <#{selected_channel}>",
-                            view=None
-                        )
+                        await select_interaction.response.send_message(f"✅ Channel for **{feature} games** set to <#{selected_channel}>", ephemeral=True)
 
                 view2 = ui.View()
                 view2.add_item(ChannelSelect())
+                await feature_interaction.response.send_message(f"📌 Now select the channel for **{feature} alerts**:", view=view2, ephemeral=True)
 
-                # DEFER before editing
-                await feature_interaction.response.defer(ephemeral=True)
-                await feature_interaction.edit_original_message(
-                    content=f"📌 Now select the channel for **{feature} alerts**:",
-                    view=view2
-                )
+        view = ui.View()
+        view.add_item(FeatureSelect())
+        await interaction.response.send_message("📌 Select which feature you want to configure:", view=view, ephemeral=True)
+
+    return app_commands.Command(name="gamesetup", description="Configure channels for new/updated/fixed game alerts (Owner Only)", callback=gamesetup)
 
 
 def create_testgamealerts_command(monitor: GameMonitor):
