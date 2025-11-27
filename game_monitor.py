@@ -383,11 +383,8 @@ class GameMonitor:
 # ---------- Slash command creators (to be registered in manifest.py on_ready) ----------
 def create_gamesetup_command(monitor: GameMonitor):
     async def gamesetup(interaction: discord.Interaction):
-        # MUST DEFER FIRST OR DISCORD EXPIRES IT
-        await interaction.response.defer(ephemeral=True)
-
         if interaction.user.id != interaction.guild.owner_id:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "❌ Only the server owner can use this command.",
                 ephemeral=True
             )
@@ -414,7 +411,7 @@ def create_gamesetup_command(monitor: GameMonitor):
                     options=feature_options
                 )
 
-            async def callback(self, current_interaction: discord.Interaction):
+            async def callback(self, feature_interaction: discord.Interaction):
                 feature = self.values[0]
 
                 class ChannelSelect(ui.Select):
@@ -438,26 +435,26 @@ def create_gamesetup_command(monitor: GameMonitor):
 
                         monitor.save_config()
 
-                        await select_interaction.response.send_message(
-                            f"✅ Channel for **{feature} games** set to <#{selected_channel}>",
-                            ephemeral=True
+                        # EDIT original message instead of sending new followup
+                        await select_interaction.response.edit_message(
+                            content=f"✅ Channel for **{feature} games** set to <#{selected_channel}>",
+                            view=None
                         )
 
                 view2 = ui.View()
                 view2.add_item(ChannelSelect())
 
-                # MUST use response.send_message here, using the correct interaction
-                await current_interaction.response.send_message(
-                    f"📌 Now select the channel for **{feature} alerts**:",
-                    view=view2,
-                    ephemeral=True
+                # EDIT original message instead of sending new followup
+                await feature_interaction.response.edit_message(
+                    content=f"📌 Now select the channel for **{feature} alerts**:",
+                    view=view2
                 )
 
         view = ui.View()
         view.add_item(FeatureSelect())
 
-        # MUST use followup.send because original interaction is deferred
-        await interaction.followup.send(
+        # Send initial message
+        await interaction.response.send_message(
             "📌 Select which feature you want to configure:",
             view=view,
             ephemeral=True
@@ -468,7 +465,6 @@ def create_gamesetup_command(monitor: GameMonitor):
         description="Configure channels for new/updated/fixed game alerts (Owner Only)",
         callback=gamesetup
     )
-
 
 
 def create_testgamealerts_command(monitor: GameMonitor):
