@@ -46,7 +46,7 @@ async def on_ready():
     # bot.tree.add_command(create_resetgames_command(game_monitor), guild=guild)
     bot.tree.add_command(create_newgame_command(game_monitor), guild=guild)
     bot.tree.add_command(create_fixegame_command(game_monitor), guild=guild)
-    bot.tree.add_command(create_updategame_command(monitor))
+    bot.tree.add_command(create_updategame_command(monitor), guild=guild)
 
 
     # Public command for everyone
