@@ -241,7 +241,7 @@ class GameMonitor:
 
     def make_fix_embed(self, name: str, download_url: str, size: str, image: Optional[str] = None):
         embed = discord.Embed(
-            title=f"🛠️ {name}",
+            title=f"🛠️#{name}",
             description=f"📥 [Download ZIP]({download_url})\n{('• Size: ' + size) if size else ''}",
             color=discord.Color.green()
         )
@@ -607,7 +607,7 @@ def create_updategame_command(monitor: GameMonitor):
                 return
 
             # Send first 10 updated games as embeds
-            for name, appid, img in results[:10]:
+            for name, appid, img in results:
                 embed = monitor.make_game_embed(name, appid, img, "UPDATED")
                 await interaction.followup.send(embed=embed)
 
