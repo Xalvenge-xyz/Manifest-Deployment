@@ -20,8 +20,9 @@ from game_monitor import (
     create_updategame_command,
     # create_resetgames_command
 )
-keep_alive()  
+ 
 load_dotenv()
+keep_alive() 
 TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID"))
 
