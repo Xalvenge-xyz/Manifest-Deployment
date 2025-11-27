@@ -5,7 +5,6 @@ from discord import app_commands
 from discord.ext import commands
 from status_bot import StatusMonitor
 import requests
-from keep_alive import keep_alive
 from io import BytesIO
 from status_bot import StatusMonitor, create_setting_command
 from game_monitor import GameMonitor, create_gamesetup_command
