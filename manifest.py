@@ -46,8 +46,7 @@ async def on_ready():
     # bot.tree.add_command(create_resetgames_command(game_monitor), guild=guild)
     bot.tree.add_command(create_newgame_command(game_monitor), guild=guild)
     bot.tree.add_command(create_fixegame_command(game_monitor), guild=guild)
-    bot.tree.add_command(create_updategame_command(monitor), guild=guild)
-
+    bot.tree.add_command(create_updategame_command(game_monitor), guild=guild)
 
     # Public command for everyone
     bot.tree.add_command(create_gamelist_command(game_monitor), guild=guild)
@@ -85,7 +84,7 @@ async def manifest(interaction: discord.Interaction, appid: str):
         await interaction.response.send_message("❌ App ID must be numbers only!", ephemeral=True)
         return
 
-    await interaction.response.defer()
+    await interaction.response.defer(ephemeral=True)
 
     # Get Steam info (game name + image)
     info = get_steam_info(appid)

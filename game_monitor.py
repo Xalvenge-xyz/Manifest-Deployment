@@ -495,7 +495,7 @@ def create_testgamealerts_command(monitor: GameMonitor):
 
 def create_gamelist_command(monitor: GameMonitor):
     async def gamelist(interaction: discord.Interaction):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         games = await monitor.fetch_games()
         if not games:
             await interaction.followup.send("❌ Failed to load game list.", ephemeral=True)
@@ -549,7 +549,7 @@ def create_newgame_command(monitor: GameMonitor):
         Manual command: fetch what would be considered 'new' since last saved seen_new set,
         but DOES NOT modify the seen set (so automatic alerts remain unchanged).
         """
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         games = await monitor.fetch_games()
         if not games:
             await interaction.followup.send("❌ Failed to load game list.", ephemeral=True)
@@ -585,7 +585,7 @@ def create_newgame_command(monitor: GameMonitor):
 
 def create_updategame_command(monitor: GameMonitor):
     async def updategame(interaction: discord.Interaction):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         games = await monitor.fetch_games()
         if not games:
@@ -617,7 +617,7 @@ def create_fixegame_command(monitor: GameMonitor):
         """
         Fetch all fixes via Playwright and show them (does not modify seen_fixed).
         """
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         fixes = await monitor.scrape_fixes_with_playwright()
         if not fixes:
             await interaction.followup.send("❌ Failed to load fixes.", ephemeral=True)
@@ -658,7 +658,7 @@ def create_gamesearch_command(monitor):
     @app_commands.rename(name="game")  # <--- this changes the option name in Discord
     async def gamesearch(interaction: discord.Interaction, name: str):
         query = name  # internally we use 'query'
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         games = await monitor.fetch_games()
         if not games:
             await interaction.followup.send("❌ Failed to load game list.", ephemeral=True)
