@@ -435,8 +435,9 @@ def create_gamesetup_command(monitor: GameMonitor):
 
                         monitor.save_config()
 
-                        # EDIT original message instead of sending new followup
-                        await select_interaction.response.edit_message(
+                        # DEFER first (acknowledge) before editing
+                        await select_interaction.response.defer(ephemeral=True)
+                        await select_interaction.edit_original_message(
                             content=f"✅ Channel for **{feature} games** set to <#{selected_channel}>",
                             view=None
                         )
@@ -444,27 +445,12 @@ def create_gamesetup_command(monitor: GameMonitor):
                 view2 = ui.View()
                 view2.add_item(ChannelSelect())
 
-                # EDIT original message instead of sending new followup
-                await feature_interaction.response.edit_message(
+                # DEFER before editing
+                await feature_interaction.response.defer(ephemeral=True)
+                await feature_interaction.edit_original_message(
                     content=f"📌 Now select the channel for **{feature} alerts**:",
                     view=view2
                 )
-
-        view = ui.View()
-        view.add_item(FeatureSelect())
-
-        # Send initial message
-        await interaction.response.send_message(
-            "📌 Select which feature you want to configure:",
-            view=view,
-            ephemeral=True
-        )
-
-    return app_commands.Command(
-        name="gamesetup",
-        description="Configure channels for new/updated/fixed game alerts (Owner Only)",
-        callback=gamesetup
-    )
 
 
 def create_testgamealerts_command(monitor: GameMonitor):
