@@ -121,7 +121,7 @@ async def manifest(interaction: discord.Interaction, appid: str):
     # Send reply with embed + file
     await interaction.followup.send(
         embed=embed,
-        file=discord.File(file_bytes, filename=f"{appid}.rar")
+        file=discord.File(file_bytes, filename=f"{appid}")
     )
 
 bot.run(TOKEN)
