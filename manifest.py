@@ -95,7 +95,7 @@ async def manifest(interaction: discord.Interaction, appid: str):
     game_name = info["name"]
     game_image = info["image"]
 
-    # Download manifest
+    # Download manifest from manifestor.cc
     manifest_url = f"https://manifestor.cc/?appid={appid}&source=github"
     res = requests.get(manifest_url)
 
@@ -103,25 +103,29 @@ async def manifest(interaction: discord.Interaction, appid: str):
         await interaction.followup.send("❌ Manifest not found. Try another App ID.")
         return
 
-    # file_bytes = BytesIO(res.content)
-    # file_bytes.seek(0)
+    file_bytes = BytesIO(res.content)
+    file_bytes.seek(0)
+
+    # Use .lua extension since most manifests are Lua scripts
+    filename = f"{appid}.lua"
 
     # Create professional embed
     embed = discord.Embed(
         title=f"🎮 {game_name}",
         description=f"📦 **Manifest for App ID:** `{appid}`",
-        color=discord.Color.blurple()  # clean, professional color
+        color=discord.Color.blurple()
     )
 
     if game_image:
-        embed.set_image(url=game_image)  # big banner style
+        embed.set_image(url=game_image)
 
     embed.set_footer(text="Steam game bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
 
-    # Send reply with embed + file
-    # await interaction.followup.send(
-    #     embed=embed,
-    #     file=discord.File(file_bytes, filename=f"{appid}.rar")
-    # )
+    # Send reply with embed + Lua file
+    await interaction.followup.send(
+        embed=embed,
+        file=discord.File(file_bytes, filename=filename)
+    )
+
 
 bot.run(TOKEN)
