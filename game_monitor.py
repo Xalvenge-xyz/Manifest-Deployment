@@ -584,12 +584,19 @@ def create_newgame_command(monitor: GameMonitor):
 
     return app_commands.Command(name="newgame", description="Show newly added games (does not modify automatic seen sets)", callback=newgame)
 
-def create_updategame_command(monitor: GameMonitor):
+def create_updategame_command(monitor):
     async def updategame(interaction: discord.Interaction):
+        # Defer the interaction to avoid timeout
         await interaction.response.defer(ephemeral=True)
 
         async def send_updates():
-            games = await monitor.fetch_games()
+            try:
+                games = await monitor.fetch_games()
+            except Exception as e:
+                print(f"[ERROR] Failed to fetch games: {e}")
+                await interaction.followup.send("❌ Failed to load game list.", ephemeral=True)
+                return
+
             if not games:
                 await interaction.followup.send("❌ Failed to load game list.", ephemeral=True)
                 return
@@ -604,15 +611,21 @@ def create_updategame_command(monitor: GameMonitor):
                     results.append((name, appid, img))
 
             if not results:
-                await interaction.followup.send("⚠ No UPDATED games found.", ephemeral=True)
+                try:
+                    await interaction.followup.send("⚠ No UPDATED games found.", ephemeral=True)
+                except Exception as e:
+                    print(f"[ERROR] Failed to send followup: {e}")
                 return
 
-            # Send first 10 updated games as embeds
+            # Send updated games safely
             for name, appid, img in results:
                 embed = monitor.make_game_embed(name, appid, img, "UPDATED")
-                await interaction.followup.send(embed=embed)
+                try:
+                    await interaction.followup.send(embed=embed)
+                except Exception as e:
+                    print(f"[ERROR] Failed to send embed: {e}")
 
-        # Run in background to avoid interaction timing out
+        # Run in background to prevent timeout
         asyncio.create_task(send_updates())
 
     return app_commands.Command(
