@@ -83,14 +83,16 @@ class StatusMonitor:
             remaining = CHECK_INTERVAL
 
             embed = Embed(
-                title="🔔Real-Time Status",
+                title="🔔 Real-Time Status",
                 description=status_text,
                 color=Color.blurple()
             )
-            embed.set_image(url=f"attachment://{os.path.basename(local_gif_path)}")
+            embed.set_image(url=f"attachment://{os.path.basename(local_gif_path)}")  # reference the file
             embed.set_footer(text=f"Next update in {remaining // 60:02d}:{remaining % 60:02d}")
 
-            msg = await channel.send(embed=embed)
+            # SEND ONCE: embed + file together
+            msg = await channel.send(embed=embed, file=discord.File(local_gif_path))
+
 
         except discord.errors.Forbidden:
             print(f"[ERROR] Missing permission in channel {channel_id}")
