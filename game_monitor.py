@@ -625,10 +625,16 @@ def create_updategame_command(monitor: GameMonitor):
 def create_fixegame_command(monitor: GameMonitor):
     async def fixegame(interaction: discord.Interaction):
         """
-        Fetch all fixes via Playwright and show them (does not modify seen_fixed).
+        Fetch all fixes via Playwright first; fallback to HTML parser if Playwright fails.
         """
         await interaction.response.defer(ephemeral=True)
+
+        # Try Playwright first
         fixes = await monitor.scrape_fixes_with_playwright()
+        if not fixes:
+            # fallback to HTML parsing
+            fixes = await monitor.fetch_fixes()
+
         if not fixes:
             await interaction.followup.send("❌ Failed to load fixes.", ephemeral=True)
             return
