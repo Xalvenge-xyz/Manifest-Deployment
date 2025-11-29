@@ -116,7 +116,7 @@ async def manifest(interaction: discord.Interaction, appid: str):
     if game_image:
         embed.set_image(url=game_image)  # big banner style
 
-    embed.set_footer(text="Steam Manifest Bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
+    embed.set_footer(text="Steam game bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
 
     # Send reply with embed + file
     await interaction.followup.send(

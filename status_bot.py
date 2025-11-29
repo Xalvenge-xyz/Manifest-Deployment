@@ -10,7 +10,6 @@ from bs4 import BeautifulSoup
 CONFIG_FILE = "status_config.json"
 STATUS_URL = "https://status.manifestor.cc/"
 CHECK_INTERVAL = 5 * 60  # 5 minutes
-BANNER_IMAGE_URL = "https://media.giphy.com/media/kyLYXonQYYfwYDIeZl/giphy.gif"
 
 
 class StatusMonitor:
@@ -72,17 +71,23 @@ class StatusMonitor:
         if not channel:
             print(f"[ERROR] Channel {channel_id} not found.")
             return
+        
+        local_gif_path = "img/SERVER STATUS.gif"  # <-- change to your local GIF path
 
+        if not os.path.exists(local_gif_path):
+            print(f"[ERROR] GIF file not found: {local_gif_path}")
+            return
+    
         try:
             status_text = self.fetch_status()
             remaining = CHECK_INTERVAL
 
             embed = Embed(
-                title="🔔 Manifestor.cc Real-Time Status",
+                title="🔔Real-Time Status",
                 description=status_text,
                 color=Color.blurple()
             )
-            embed.set_image(url=BANNER_IMAGE_URL)
+            embed.set_image(url=f"attachment://{os.path.basename(local_gif_path)}")
             embed.set_footer(text=f"Next update in {remaining // 60:02d}:{remaining % 60:02d}")
 
             msg = await channel.send(embed=embed)

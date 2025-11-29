@@ -237,7 +237,7 @@ class GameMonitor:
         )
         if image:
             embed.set_image(url=image)
-        embed.set_footer(text="Steam Manifest Bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
+        embed.set_footer(text="Steam game bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
         return embed
 
     def make_fix_embed(self, name: str, download_url: str, size: str, image: Optional[str] = None):
@@ -251,7 +251,7 @@ class GameMonitor:
         if image and os.path.exists(image):
             embed.set_image(url=f"attachment://{os.path.basename(image)}")  # THIS makes it appear inside the embed
 
-        embed.set_footer(text="Fix posted by Steam Manifest Bot • XALVENGE D.")
+        embed.set_footer(text="Steam game bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
         return embed
 
 
@@ -472,7 +472,7 @@ def create_testgamealerts_command(monitor: GameMonitor):
                     color=discord.Color.green() if feature_name == "Fixed" else discord.Color.blurple()
                 )
 
-            embed.set_footer(text="Steam Manifest Bot • XALVENGE D.")
+            embed.set_footer(text="Steam game bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
 
             # Send via safe_send (handles missing permissions etc.)
             await monitor.safe_send(channel_id, embed, local_file=banner_path if os.path.exists(banner_path) else None)
@@ -520,7 +520,7 @@ def create_gamelist_command(monitor: GameMonitor):
                 description=text[:4096],  # discord safety
                 color=Color.blurple()
             )
-            embed.set_footer(text="Steam Manifest Bot • XALVENGE D.")
+            embed.set_footer(text="Steam game bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
             embeds.append(embed)
 
         # send in order + 2 second delay per embed
@@ -696,7 +696,7 @@ def create_gamesearch_command(monitor):
                 description=text[:4096],
                 color=Color.blurple()
             )
-            embed.set_footer(text="Steam Manifest Bot • XALVENGE D.")
+            embed.set_footer(text="Steam game bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
             embeds.append(embed)
 
         # send first page (ephemeral messages can be edited, but cannot be fetched)
