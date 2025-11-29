@@ -96,7 +96,7 @@ async def manifest(interaction: discord.Interaction, appid: str):
     game_image = info["image"]
 
     # Download manifest from manifestor.cc
-    manifest_url = f"https://manifestor.cc/?appid={appid}&source=github"
+    manifest_url = f"https://manifestor.cc/raw/{appid}.lua"
     res = requests.get(manifest_url)
 
     if res.status_code != 200 or len(res.content) < 50:
@@ -124,8 +124,7 @@ async def manifest(interaction: discord.Interaction, appid: str):
     # Send reply with embed + Lua file
     await interaction.followup.send(
         embed=embed,
-        file=discord.File(file_bytes, filename=filename)
+        file=discord.File(file_bytes, filename=f"{appid}.lua")
     )
-
 
 bot.run(TOKEN)
