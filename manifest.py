@@ -6,6 +6,7 @@ from discord.ext import commands
 from status_bot import StatusMonitor
 import requests
 from keep_alive import keep_alive
+from playwright.async_api import async_playwright
 from io import BytesIO
 from status_bot import StatusMonitor, create_setting_command
 from game_monitor import GameMonitor, create_gamesetup_command
@@ -76,6 +77,7 @@ def get_steam_info(appid):
         return None
 
 
+
 @bot.tree.command(name="manifest", description="Get a Steam manifest file with game info")
 @app_commands.describe(appid="Enter the Steam App ID")
 async def manifest(interaction: discord.Interaction, appid: str):
@@ -95,36 +97,52 @@ async def manifest(interaction: discord.Interaction, appid: str):
     game_name = info["name"]
     game_image = info["image"]
 
-    # Download manifest from manifestor.cc
-    manifest_url = f"https://manifestor.cc/raw/{appid}.lua"
-    res = requests.get(manifest_url)
+    # --- Playwright section to get actual Lua file ---
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto("https://manifestor.cc/")
+        
+        # Wait for page to load (adjust selector if needed)
+        await page.wait_for_selector("input[type='text']")
 
-    if res.status_code != 200 or len(res.content) < 50:
-        await interaction.followup.send("❌ Manifest not found. Try another App ID.")
-        return
+        # Fill AppID in the input field
+        await page.fill("input[type='text']", appid)
 
-    file_bytes = BytesIO(res.content)
-    file_bytes.seek(0)
+        # Click the 'Get Manifest' or equivalent button
+        # You need to inspect the button selector on the site, example:
+        await page.click("button#get-manifest")  # <-- replace with actual selector
 
-    # Use .lua extension since most manifests are Lua scripts
-    filename = f"{appid}.lua"
+        # Wait for download to be ready
+        # Playwright allows intercepting downloads:
+        async with page.expect_download() as download_info:
+            pass  # already triggered by button click
+        download = await download_info.value
+        file_path = await download.path()
+        
+        # Read file content
+        with open(file_path, "rb") as f:
+            file_bytes = BytesIO(f.read())
+        file_bytes.seek(0)
 
-    # Create professional embed
+        await browser.close()
+    # --- End Playwright section ---
+
+    # Create embed
     embed = discord.Embed(
         title=f"🎮 {game_name}",
         description=f"📦 **Manifest for App ID:** `{appid}`",
         color=discord.Color.blurple()
     )
-
     if game_image:
         embed.set_image(url=game_image)
-
     embed.set_footer(text="Steam game bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
 
-    # Send reply with embed + Lua file
+    # Send the Lua file
     await interaction.followup.send(
         embed=embed,
         file=discord.File(file_bytes, filename=f"{appid}.lua")
     )
+
 
 bot.run(TOKEN)
