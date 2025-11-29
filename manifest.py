@@ -76,20 +76,18 @@ def get_steam_info(appid):
     except:
         return None
 
-
+# -------- DISCORD COMMAND --------
 @bot.tree.command(name="manifest", description="Get a Steam manifest file with game info")
 @app_commands.describe(appid="Enter the Steam App ID")
 async def manifest(interaction: discord.Interaction, appid: str):
+
     if not appid.isdigit():
-        await interaction.response.send_message(
-            "❌ App ID must be numbers only!", ephemeral=True
-        )
+        await interaction.response.send_message("❌ App ID must be numbers only!", ephemeral=True)
         return
 
-    # Defer interaction (acknowledge and give bot time)
     await interaction.response.defer()
 
-    # Get Steam info (game name + image)
+    # Get Steam info
     info = get_steam_info(appid)
     if not info:
         await interaction.followup.send("❌ Game not found on Steam.")
@@ -98,39 +96,36 @@ async def manifest(interaction: discord.Interaction, appid: str):
     game_name = info["name"]
     game_image = info["image"]
 
-    file_bytes = BytesIO()  # prepare in-memory file
+    file_bytes = BytesIO()
 
     try:
-        # --- Playwright section ---
+        # ===============================
+        #  PLAYWRIGHT SECTION (REAL BROWSER)
+        # ===============================
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-
-            # Navigate to Manifestor
-            await page.goto("https://manifestor.cc/")
-
-            # Wait for AppID input field to appear
-            await page.wait_for_selector("input[type='text']")
-
-            # Fill AppID
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+                viewport={"width": 1280, "height": 800},
+                java_script_enabled=True
+            )
+            page = await context.new_page()
+            await page.goto("https://manifestor.cc/", wait_until="networkidle")
             await page.fill("input[type='text']", appid)
-
-            # Intercept download
-            async with page.expect_download() as download_info:
-                # Click the "Get Manifest" button
-                await page.click("button")  # <-- Replace with the actual button selector
-            download = await download_info.value
-            file_path = await download.path()
-
-            # Read the Lua file
-            with open(file_path, "rb") as f:
-                file_bytes.write(f.read())
+            
+            async with page.expect_download() as dl_info:
+                await page.click("button[type='submit']")  # replace with exact selector
+            download = await dl_info.value
+            data = await download.read_bytes()
+            file_bytes.write(data)
             file_bytes.seek(0)
-
+            
+            await context.close()
             await browser.close()
-        # --- End Playwright section ---
 
-        # Create embed
+        # ===============================
+
+        # Discord Embed
         embed = discord.Embed(
             title=f"🎮 {game_name}",
             description=f"📦 **Manifest for App ID:** `{appid}`",
@@ -138,19 +133,16 @@ async def manifest(interaction: discord.Interaction, appid: str):
         )
         if game_image:
             embed.set_image(url=game_image)
-        embed.set_footer(text="Steam game bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
+        embed.set_footer(text="Steam manifest bot by JAY XALVENGE")
 
-        # Send the Lua file
         await interaction.followup.send(
             embed=embed,
             file=discord.File(file_bytes, filename=f"{appid}.lua")
         )
 
     except Exception as e:
-        # Handle timeout / interaction expired gracefully
-        await interaction.followup.send(
-            f"❌ Failed to fetch manifest. Error: {e}", ephemeral=True
-        )
+        await interaction.followup.send(f"❌ Failed to fetch manifest:\n```{e}```", ephemeral=True)
+
 
 
 
