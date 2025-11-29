@@ -634,53 +634,38 @@ def create_updategame_command(monitor: GameMonitor):
 
 def create_fixegame_command(monitor: GameMonitor):
     async def fixegame(interaction: discord.Interaction):
-        """
-        Show fixes per game in professional embeds with banner and download button.
-        """
-        await interaction.response.defer(ephemeral=False)  # public
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception:
+            pass  # already deferred or expired
 
-        # Fetch fixes
         fixes = await monitor.scrape_fixes_with_playwright()
         if not fixes:
             fixes = await monitor.fetch_fixes()
 
         if not fixes:
-            await interaction.followup.send("❌ Failed to load fixes.", ephemeral=True)
+            try:
+                await interaction.followup.send("❌ Failed to load fixes.", ephemeral=True)
+            except Exception:
+                pass
             return
 
-        # Default banner
         default_banner = "img/giphy.gif"
-
-        sent_count = 0
         for f in fixes:
-            game_title = f.get("title")  # game/fix title
-            download = f.get("download")
-            size = f.get("size", "")
-
-            # Embed per game
-            embed = Embed(
-                title=f"🛠️ Fix for {game_title}",
-                description=f"📥 [Download ZIP]({download})\n{('• Size: ' + size) if size else ''}",
-                color=Color.green()
+            embed = monitor.make_fix_embed(
+                f["title"], f["download"], f.get("size", ""), default_banner
             )
-            embed.set_image(url=default_banner)
-            embed.set_footer(text="Fix posted by Steam Manifest Bot • XALVENGE D.")
+            await monitor.safe_send(monitor.config.get("channel_id_fixed"), embed, local_file=default_banner)
+            await asyncio.sleep(0.5)
 
-            # Send to configured "Fixed Games" channel
-            ch_id = monitor.config.get("channel_id_fixed")
-            if ch_id:
-                await monitor.safe_send(ch_id, embed, local_file=default_banner)
-            else:
-                await interaction.followup.send(embed=embed)
-
-            sent_count += 1
-            await asyncio.sleep(0.5)  # avoid rate-limit
-
-        await interaction.followup.send(f"✅ {sent_count} fixes displayed.", ephemeral=True)
+        try:
+            await interaction.followup.send(f"✅ {len(fixes)} fixes found — all displayed.", ephemeral=True)
+        except Exception:
+            pass
 
     return app_commands.Command(
         name="fixegame",
-        description="Show current fixes per game with professional embeds",
+        description="Show current fixed games (does not modify automatic seen sets)",
         callback=fixegame
     )
 
