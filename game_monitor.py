@@ -637,7 +637,7 @@ def create_fixegame_command(monitor: GameMonitor):
         """
         Fetch all fixes via Playwright first; fallback to HTML parser if Playwright fails.
         """
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()  # public
 
         # Try Playwright first
         fixes = await monitor.scrape_fixes_with_playwright()
@@ -650,25 +650,44 @@ def create_fixegame_command(monitor: GameMonitor):
             return
 
         # path to default local banner
-        default_banner = "img/giphy.gif"  # <-- your local file
+        default_banner = "img/giphy.gif"
 
-        # send ALL fixes with professional embed
+        # prepare text lines
+        lines = []
         for f in fixes:
-            embed = monitor.make_fix_embed(
-                f.get("title"),
-                f.get("download"),
-                f.get("size", ""),
-                image=default_banner
-            )
-            await monitor.safe_send(
-                monitor.config.get("channel_id_fixed"),
-                embed,
-                local_file=default_banner
-            )
+            title = f.get("title")
+            download = f.get("download")
+            size = f.get("size", "")
+            line = f"● **{title}** — [Download]({download}){' • Size: ' + size if size else ''}"
+            lines.append(line)
 
-        await interaction.followup.send(
-            f"✅ {len(fixes)} fixes found — all displayed.", ephemeral=True
-        )
+        # split into chunks (max 25 lines per embed is safe)
+        chunk_size = 25
+        chunks = [lines[i:i + chunk_size] for i in range(0, len(lines), chunk_size)]
+
+        embeds = []
+        for idx, chunk in enumerate(chunks, start=1):
+            embed = discord.Embed(
+                title=f"🛠️ Fixes — Page {idx}/{len(chunks)}",
+                description="\n".join(chunk),
+                color=discord.Color.green()
+            )
+            embed.set_footer(text="Steam Manifest Bot • XALVENGE D.")
+            if default_banner:
+                embed.set_image(url=f"attachment://{default_banner}")
+            embeds.append(embed)
+
+        # send first embed
+        msg = await interaction.followup.send(embed=embeds[0])
+        msg = await msg.fetch()
+
+        # sequentially edit message for subsequent pages
+        for embed in embeds[1:]:
+            await asyncio.sleep(2)
+            try:
+                await msg.edit(embed=embed)
+            except Exception as e:
+                print("[ERROR] Failed to edit message:", e)
 
     return app_commands.Command(
         name="fixegame",
