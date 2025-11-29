@@ -639,9 +639,12 @@ def create_fixegame_command(monitor: GameMonitor):
         except Exception:
             pass  # already deferred or expired
 
+        # ----- Fetch fixes -----
         fixes = await monitor.scrape_fixes_with_playwright()
+
         if not fixes:
-            fixes = await monitor.fetch_fixes()
+            # fallback to BeautifulSoup HTML parsing
+            fixes = await monitor.fetch_fixes_bs()
 
         if not fixes:
             try:
@@ -650,16 +653,38 @@ def create_fixegame_command(monitor: GameMonitor):
                 pass
             return
 
-        default_banner = "img/giphy.gif"
+        # ----- Settings -----
+        default_banner = "img/giphy.gif"  # local banner image
+        batch_size = 10  # number of embeds per Discord message
+
+        # ----- Prepare embeds -----
+        embeds = []
         for f in fixes:
             embed = monitor.make_fix_embed(
-                f["title"], f["download"], f.get("size", ""), default_banner
+                name=f.get("title"),
+                download_url=f.get("download"),
+                size=f.get("size", ""),
+                image=default_banner
             )
-            await monitor.safe_send(monitor.config.get("channel_id_fixed"), embed, local_file=default_banner)
-            await asyncio.sleep(0.5)
+            embeds.append(embed)
 
+        # ----- Send in batches -----
+        channel_id = monitor.config.get("channel_id_fixed")
+        if not channel_id:
+            await interaction.followup.send("⚠ No fixed games channel configured.", ephemeral=True)
+            return
+
+        for i in range(0, len(embeds), batch_size):
+            batch = embeds[i:i+batch_size]
+            for embed in batch:
+                await monitor.safe_send(channel_id, embed, local_file=default_banner)
+                await asyncio.sleep(0.5)  # avoid spamming Discord
+
+        # ----- Final confirmation -----
         try:
-            await interaction.followup.send(f"✅ {len(fixes)} fixes found — all displayed.", ephemeral=True)
+            await interaction.followup.send(
+                f"✅ {len(fixes)} fixes found — all displayed.", ephemeral=True
+            )
         except Exception:
             pass
 
@@ -668,6 +693,50 @@ def create_fixegame_command(monitor: GameMonitor):
         description="Show current fixed games (does not modify automatic seen sets)",
         callback=fixegame
     )
+
+
+# -------------------------
+# Add this BeautifulSoup fallback to your GameMonitor class
+# -------------------------
+async def fetch_fixes_bs(self) -> List[Dict[str, Any]]:
+    """
+    Fallback HTML parser using BeautifulSoup.
+    """
+    async with aiohttp.ClientSession(timeout=self.session_timeout, connector=self.connector) as session:
+        html = await self.safe_get_text(session, FIXES_PAGE_URL)
+        if not html:
+            return []
+
+        soup = BeautifulSoup(html, "html.parser")
+        results = []
+
+        for a in soup.find_all("a", class_="file-item"):
+            href = a.get("href") or ""
+            name_div = a.find("div", class_="file-name")
+            size_div = a.find("div", class_="file-size")
+
+            name = name_div.text.strip() if name_div else None
+            size = size_div.text.strip() if size_div else ""
+
+            if not name and href:
+                name = href.rstrip("/").split("/")[-1]
+                name = re.sub(r'%20', ' ', name)
+
+            if name:
+                title = re.sub(r'\.(zip|rar|7z|tar\.gz)$', '', name, flags=re.I)
+                if href.startswith("/"):
+                    href = "https://generator.ryuu.lol" + href
+                results.append({"title": title, "download": href, "size": size})
+
+        # dedupe
+        seen = set()
+        uniq = []
+        for item in results:
+            if item["title"] in seen:
+                continue
+            seen.add(item["title"])
+            uniq.append(item)
+        return uniq
 
 def create_gamesearch_command(monitor):
     @app_commands.command(name="gamesearch", description="Search games by title or App ID")
