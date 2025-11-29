@@ -71,13 +71,13 @@ class StatusMonitor:
         if not channel:
             print(f"[ERROR] Channel {channel_id} not found.")
             return
-        
-        local_gif_path = "img/SERVER STATUS.gif"  # <-- change to your local GIF path
+
+        local_gif_path = "img/SERVER STATUS.gif"
 
         if not os.path.exists(local_gif_path):
             print(f"[ERROR] GIF file not found: {local_gif_path}")
             return
-    
+
         try:
             status_text = self.fetch_status()
             remaining = CHECK_INTERVAL
@@ -88,44 +88,37 @@ class StatusMonitor:
                 description=status_text,
                 color=Color.blurple()
             )
-            embed.set_image(url=f"attachment://{os.path.basename(local_gif_path)}")  # reference the file
+            embed.set_image(url=f"attachment://{os.path.basename(local_gif_path)}")
             embed.set_footer(text=f"Next update in {remaining // 60:02d}:{remaining % 60:02d}")
 
-            # SEND ONCE: embed + file together
+            # Send the embed with the file
             msg = await channel.send(embed=embed, file=file)
 
+            # Live countdown: send a **new file each time** to keep the GIF visible
+            while remaining > 0:
+                mins, secs = divmod(remaining, 60)
+                embed.set_footer(text=f"Next update in {mins:02d}:{secs:02d}")
+                
+                # EDIT embed **without removing the GIF**
+                await msg.edit(embed=embed)
+                await asyncio.sleep(1)
+                remaining -= 1
+
+            # Final update: send a new embed with the file again to reset the GIF
+            embed.description = self.fetch_status()
+            embed.set_footer(text="Next update in 05:00")
+            await channel.send(embed=embed, file=discord.File(local_gif_path))
 
         except discord.errors.Forbidden:
             print(f"[ERROR] Missing permission in channel {channel_id}")
             return
 
-        # Live countdown
-        while remaining > 0:
-            mins, secs = divmod(remaining, 60)
-            embed.set_footer(text=f"Next update in {mins:02d}:{secs:02d}")
-
-            try:
-                await msg.edit(embed=embed)
-            except discord.errors.Forbidden:
-                return
-
-            await asyncio.sleep(1)
-            remaining -= 1
-
-        embed.description = self.fetch_status()
-        embed.set_footer(text="Next update in 05:00")
-
-        try:
-            await msg.edit(embed=embed)
-        except discord.errors.Forbidden:
-            pass
-
-    # -------- LOOP --------
-    @tasks.loop(seconds=CHECK_INTERVAL)
-    async def status_loop(self):
-        await self.bot.wait_until_ready()
-        for guild_id, channel_id in self.config.items():
-            await self.send_visual_status(channel_id)
+        # -------- LOOP --------
+        @tasks.loop(seconds=CHECK_INTERVAL)
+        async def status_loop(self):
+            await self.bot.wait_until_ready()
+            for guild_id, channel_id in self.config.items():
+                await self.send_visual_status(channel_id)
 
 
 # =============  SLASH COMMAND (OUTSIDE CLASS!)  =============
