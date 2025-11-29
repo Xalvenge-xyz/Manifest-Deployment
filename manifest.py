@@ -77,15 +77,16 @@ def get_steam_info(appid):
         return None
 
 
-
 @bot.tree.command(name="manifest", description="Get a Steam manifest file with game info")
 @app_commands.describe(appid="Enter the Steam App ID")
 async def manifest(interaction: discord.Interaction, appid: str):
-
     if not appid.isdigit():
-        await interaction.response.send_message("❌ App ID must be numbers only!", ephemeral=True)
+        await interaction.response.send_message(
+            "❌ App ID must be numbers only!", ephemeral=True
+        )
         return
 
+    # Defer interaction (acknowledge and give bot time)
     await interaction.response.defer()
 
     # Get Steam info (game name + image)
@@ -97,52 +98,60 @@ async def manifest(interaction: discord.Interaction, appid: str):
     game_name = info["name"]
     game_image = info["image"]
 
-    # --- Playwright section to get actual Lua file ---
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto("https://manifestor.cc/")
-        
-        # Wait for page to load (adjust selector if needed)
-        await page.wait_for_selector("input[type='text']")
+    file_bytes = BytesIO()  # prepare in-memory file
 
-        # Fill AppID in the input field
-        await page.fill("input[type='text']", appid)
+    try:
+        # --- Playwright section ---
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
 
-        # Click the 'Get Manifest' or equivalent button
-        # You need to inspect the button selector on the site, example:
-        await page.click("button#get-manifest")  # <-- replace with actual selector
+            # Navigate to Manifestor
+            await page.goto("https://manifestor.cc/")
 
-        # Wait for download to be ready
-        # Playwright allows intercepting downloads:
-        async with page.expect_download() as download_info:
-            pass  # already triggered by button click
-        download = await download_info.value
-        file_path = await download.path()
-        
-        # Read file content
-        with open(file_path, "rb") as f:
-            file_bytes = BytesIO(f.read())
-        file_bytes.seek(0)
+            # Wait for AppID input field to appear
+            await page.wait_for_selector("input[type='text']")
 
-        await browser.close()
-    # --- End Playwright section ---
+            # Fill AppID
+            await page.fill("input[type='text']", appid)
 
-    # Create embed
-    embed = discord.Embed(
-        title=f"🎮 {game_name}",
-        description=f"📦 **Manifest for App ID:** `{appid}`",
-        color=discord.Color.blurple()
-    )
-    if game_image:
-        embed.set_image(url=game_image)
-    embed.set_footer(text="Steam game bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
+            # Intercept download
+            async with page.expect_download() as download_info:
+                # Click the "Get Manifest" button
+                await page.click("button")  # <-- Replace with the actual button selector
+            download = await download_info.value
+            file_path = await download.path()
 
-    # Send the Lua file
-    await interaction.followup.send(
-        embed=embed,
-        file=discord.File(file_bytes, filename=f"{appid}.lua")
-    )
+            # Read the Lua file
+            with open(file_path, "rb") as f:
+                file_bytes.write(f.read())
+            file_bytes.seek(0)
+
+            await browser.close()
+        # --- End Playwright section ---
+
+        # Create embed
+        embed = discord.Embed(
+            title=f"🎮 {game_name}",
+            description=f"📦 **Manifest for App ID:** `{appid}`",
+            color=discord.Color.blurple()
+        )
+        if game_image:
+            embed.set_image(url=game_image)
+        embed.set_footer(text="Steam game bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
+
+        # Send the Lua file
+        await interaction.followup.send(
+            embed=embed,
+            file=discord.File(file_bytes, filename=f"{appid}.lua")
+        )
+
+    except Exception as e:
+        # Handle timeout / interaction expired gracefully
+        await interaction.followup.send(
+            f"❌ Failed to fetch manifest. Error: {e}", ephemeral=True
+        )
+
 
 
 bot.run(TOKEN)
