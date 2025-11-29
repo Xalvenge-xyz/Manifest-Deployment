@@ -103,8 +103,8 @@ async def manifest(interaction: discord.Interaction, appid: str):
         await interaction.followup.send("❌ Manifest not found. Try another App ID.")
         return
 
-    file_bytes = BytesIO(res.content)
-    file_bytes.seek(0)
+    # file_bytes = BytesIO(res.content)
+    # file_bytes.seek(0)
 
     # Create professional embed
     embed = discord.Embed(
@@ -119,9 +119,9 @@ async def manifest(interaction: discord.Interaction, appid: str):
     embed.set_footer(text="Steam game bot • Powered by JAY CAPARIDA AKA XALVENGE D.")
 
     # Send reply with embed + file
-    await interaction.followup.send(
-        embed=embed,
-        file=discord.File(file_bytes, filename=f"{appid}")
-    )
+    # await interaction.followup.send(
+    #     embed=embed,
+    #     file=discord.File(file_bytes, filename=f"{appid}.rar")
+    # )
 
 bot.run(TOKEN)
