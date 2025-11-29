@@ -6,7 +6,6 @@ from discord.ext import commands
 from status_bot import StatusMonitor
 import requests
 from keep_alive import keep_alive
-from playwright.async_api import async_playwright
 from io import BytesIO
 from status_bot import StatusMonitor, create_setting_command
 from game_monitor import GameMonitor, create_gamesetup_command
@@ -76,21 +75,21 @@ def get_steam_info(appid):
     except:
         return None
 
-# -------- DISCORD COMMAND --------
+
 @bot.tree.command(name="manifest", description="Get a Steam manifest file with game info")
 @app_commands.describe(appid="Enter the Steam App ID")
 async def manifest(interaction: discord.Interaction, appid: str):
-
     if not appid.isdigit():
         await interaction.response.send_message("❌ App ID must be numbers only!", ephemeral=True)
         return
 
-    await interaction.response.defer()
+    # Step 1: Send initial message to avoid Unknown interaction
+    await interaction.response.send_message("⏳ Fetching manifest, please wait...", ephemeral=True)
 
-    # Get Steam info
+    # Step 2: Get Steam info
     info = get_steam_info(appid)
     if not info:
-        await interaction.followup.send("❌ Game not found on Steam.")
+        await interaction.edit_original_response(content="❌ Game not found on Steam.")
         return
 
     game_name = info["name"]
@@ -98,52 +97,56 @@ async def manifest(interaction: discord.Interaction, appid: str):
 
     file_bytes = BytesIO()
 
+    # Step 3: Playwright fetch wrapped in timeout
     try:
-        # ===============================
-        #  PLAYWRIGHT SECTION (REAL BROWSER)
-        # ===============================
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
-                viewport={"width": 1280, "height": 800},
-                java_script_enabled=True
-            )
-            page = await context.new_page()
-            await page.goto("https://manifestor.cc/", wait_until="networkidle")
-            await page.fill("input[type='text']", appid)
-            
-            async with page.expect_download() as dl_info:
-                await page.click("button[type='submit']")  # replace with exact selector
-            download = await dl_info.value
-            data = await download.read_bytes()
-            file_bytes.write(data)
-            file_bytes.seek(0)
-            
-            await context.close()
-            await browser.close()
+        async def fetch_manifest():
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                context = await browser.new_context(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+                    viewport={"width": 1280, "height": 800},
+                    java_script_enabled=True
+                )
+                page = await context.new_page()
+                await page.goto("https://manifestor.cc/", wait_until="networkidle")
+                await page.fill("input[type='text']", appid)
 
-        # ===============================
+                # Click button & catch download
+                async with page.expect_download() as dl_info:
+                    await page.click("button[type='submit']")  # <-- adjust selector if needed
 
-        # Discord Embed
-        embed = discord.Embed(
-            title=f"🎮 {game_name}",
-            description=f"📦 **Manifest for App ID:** `{appid}`",
-            color=discord.Color.blurple()
-        )
-        if game_image:
-            embed.set_image(url=game_image)
-        embed.set_footer(text="Steam manifest bot by JAY XALVENGE")
+                download = await dl_info.value
+                data = await download.read_bytes()
+                file_bytes.write(data)
+                file_bytes.seek(0)
 
-        await interaction.followup.send(
-            embed=embed,
-            file=discord.File(file_bytes, filename=f"{appid}.lua")
-        )
+                await context.close()
+                await browser.close()
 
+        await asyncio.wait_for(fetch_manifest(), timeout=30)  # 30s timeout
+
+    except asyncio.TimeoutError:
+        await interaction.edit_original_response("❌ Fetching manifest timed out. Please try again later.")
+        return
     except Exception as e:
-        await interaction.followup.send(f"❌ Failed to fetch manifest:\n```{e}```", ephemeral=True)
+        await interaction.edit_original_response(f"❌ Failed to fetch manifest:\n```{e}```")
+        return
 
+    # Step 4: Create Discord embed
+    embed = discord.Embed(
+        title=f"🎮 {game_name}",
+        description=f"📦 **Manifest for App ID:** `{appid}`",
+        color=discord.Color.blurple()
+    )
+    if game_image:
+        embed.set_image(url=game_image)
+    embed.set_footer(text="Steam manifest bot by JAY XALVENGE")
 
-
+    # Step 5: Edit original response with embed + file
+    await interaction.edit_original_response(
+        content=None,
+        embed=embed,
+        file=discord.File(file_bytes, filename=f"{appid}.lua")
+    )
 
 bot.run(TOKEN)
