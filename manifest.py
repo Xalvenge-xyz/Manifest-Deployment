@@ -7,6 +7,8 @@ from status_bot import StatusMonitor
 import requests
 from keep_alive import keep_alive
 from io import BytesIO
+import asyncio
+from playwright.async_api import async_playwright
 from status_bot import StatusMonitor, create_setting_command
 from game_monitor import GameMonitor, create_gamesetup_command
 from game_monitor import (
