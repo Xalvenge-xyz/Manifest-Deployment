@@ -90,6 +90,7 @@ class GameMonitor:
     async def scrape_fixes_with_playwright(self) -> List[Dict[str, Any]]:
         """
         Scrape fixes from https://generator.ryuu.lol/fixes and cache to JSON.
+        Handles lazy loading and falls back to cached JSON on failure.
         """
         fixes = []
         try:
@@ -98,10 +99,18 @@ class GameMonitor:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()
-                await page.goto("https://generator.ryuu.lol/fixes", timeout=15000)
-                await page.wait_for_selector(".file-item", timeout=10000)
+                # Navigate to fixes page with longer timeout
+                await page.goto(FIXES_PAGE_URL, timeout=45000)
+                await page.wait_for_selector(".file-item", timeout=30000)
+
+                # Scroll to bottom a few times in case of lazy loading
+                for _ in range(5):
+                    await page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
+                    await asyncio.sleep(1)
 
                 file_items = await page.query_selector_all(".file-item")
+                print(f"[DEBUG] Found {len(file_items)} fixes")  # DEBUG
+
                 for item in file_items:
                     name_el = await item.query_selector(".file-name")
                     size_el = await item.query_selector(".file-size")
@@ -127,6 +136,7 @@ class GameMonitor:
             fixes = self.load_fixes_cache()
 
         return fixes
+
 
     def load_fixes_cache(self) -> List[Dict[str, Any]]:
         if os.path.exists("fixes_cache.json"):
@@ -495,7 +505,7 @@ def create_testgamealerts_command(monitor: GameMonitor):
 
 def create_gamelist_command(monitor: GameMonitor):
     async def gamelist(interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         games = await monitor.fetch_games()
         if not games:
             await interaction.followup.send("❌ Failed to load game list.", ephemeral=True)
@@ -624,35 +634,34 @@ def create_updategame_command(monitor: GameMonitor):
 
 def create_fixegame_command(monitor: GameMonitor):
     async def fixegame(interaction: discord.Interaction):
-        """
-        Fetch all fixes via Playwright and show them (does not modify seen_fixed).
-        """
-        await interaction.response.defer(ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception:
+            pass  # already deferred or expired
+
         fixes = await monitor.scrape_fixes_with_playwright()
         if not fixes:
-            await interaction.followup.send("❌ Failed to load fixes.", ephemeral=True)
+            fixes = await monitor.fetch_fixes()
+
+        if not fixes:
+            try:
+                await interaction.followup.send("❌ Failed to load fixes.", ephemeral=True)
+            except Exception:
+                pass
             return
 
-        # path to default local banner
-        default_banner = "img/giphy.gif"  # <-- your local file
-
-        # send ALL fixes with professional embed
+        default_banner = "img/giphy.gif"
         for f in fixes:
             embed = monitor.make_fix_embed(
-                f.get("title"),
-                f.get("download"),
-                f.get("size", ""),
-                image=default_banner
+                f["title"], f["download"], f.get("size", ""), default_banner
             )
-            await monitor.safe_send(
-                monitor.config.get("channel_id_fixed"),
-                embed,
-                local_file=default_banner
-            )
+            await monitor.safe_send(monitor.config.get("channel_id_fixed"), embed, local_file=default_banner)
+            await asyncio.sleep(0.5)
 
-        await interaction.followup.send(
-            f"✅ {len(fixes)} fixes found — all displayed.", ephemeral=True
-        )
+        try:
+            await interaction.followup.send(f"✅ {len(fixes)} fixes found — all displayed.", ephemeral=True)
+        except Exception:
+            pass
 
     return app_commands.Command(
         name="fixegame",
