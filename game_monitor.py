@@ -495,7 +495,7 @@ def create_testgamealerts_command(monitor: GameMonitor):
 
 def create_gamelist_command(monitor: GameMonitor):
     async def gamelist(interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         games = await monitor.fetch_games()
         if not games:
             await interaction.followup.send("❌ Failed to load game list.", ephemeral=True)
@@ -662,17 +662,17 @@ def create_fixegame_command(monitor: GameMonitor):
 
 def create_gamesearch_command(monitor):
     @app_commands.command(name="gamesearch", description="Search games by title or App ID")
-    @app_commands.describe(name="The game name or App ID to search for")  # description
-    @app_commands.rename(name="game")  # <--- this changes the option name in Discord
+    @app_commands.describe(name="The game name or App ID to search for")
+    @app_commands.rename(name="game")
     async def gamesearch(interaction: discord.Interaction, name: str):
-        query = name  # internally we use 'query'
+        query = name
         await interaction.response.defer(ephemeral=True)
+
         games = await monitor.fetch_games()
         if not games:
             await interaction.followup.send("❌ Failed to load game list.", ephemeral=True)
             return
 
-        # filter matches
         matches = []
         for g in games:
             title = g.get("title") or g.get("name") or "Unknown Game"
@@ -681,10 +681,12 @@ def create_gamesearch_command(monitor):
                 matches.append(f"● **{title}** — `{appid}`")
 
         if not matches:
-            await interaction.followup.send(f"⚠ No games found matching: `{query}`", ephemeral=True)
+            await interaction.followup.send(
+                f"⚠ No games found matching: `{query}`",
+                ephemeral=True
+            )
             return
 
-        # paginate results
         chunks = [matches[i:i+80] for i in range(0, len(matches), 80)]
         embeds = []
         for idx, chunk in enumerate(chunks, start=1):
@@ -697,11 +699,10 @@ def create_gamesearch_command(monitor):
             embed.set_footer(text="Steam Manifest Bot • XALVENGE D.")
             embeds.append(embed)
 
-        # send first page
-        msg = await interaction.followup.send(embed=embeds[0])
-        msg = await msg.fetch()
+        # send first page (ephemeral messages can be edited, but cannot be fetched)
+        msg = await interaction.followup.send(embed=embeds[0], ephemeral=True)
 
-        # edit subsequent pages
+        # sequentially edit with other pages
         for embed in embeds[1:]:
             await asyncio.sleep(2)
             try:
@@ -710,3 +711,4 @@ def create_gamesearch_command(monitor):
                 print("[ERROR] Failed to edit message:", e)
 
     return gamesearch
+

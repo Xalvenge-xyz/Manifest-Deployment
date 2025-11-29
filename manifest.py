@@ -84,7 +84,7 @@ async def manifest(interaction: discord.Interaction, appid: str):
         await interaction.response.send_message("❌ App ID must be numbers only!", ephemeral=True)
         return
 
-    await interaction.response.defer(ephemeral=True)
+    await interaction.response.defer()
 
     # Get Steam info (game name + image)
     info = get_steam_info(appid)
