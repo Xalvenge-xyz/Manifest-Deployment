@@ -89,33 +89,28 @@ class GameMonitor:
     # ---------- Playwright scraper for fixes ----------
     async def scrape_fixes_with_playwright(self) -> List[Dict[str, Any]]:
         """
-        Scrape fixes from https://generator.ryuu.lol/fixes reliably, including dynamically loaded items,
-        and cache to JSON.
+        Scrape fixes from https://generator.ryuu.lol/fixes and cache to JSON.
+        Handles lazy loading and falls back to cached JSON on failure.
         """
         fixes = []
-
         try:
             from playwright.async_api import async_playwright
 
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()
+                # Navigate to fixes page with longer timeout
+                await page.goto(FIXES_PAGE_URL, timeout=45000)
+                await page.wait_for_selector(".file-item", timeout=30000)
 
-                await page.goto("https://generator.ryuu.lol/fixes", timeout=30000)  # 30s timeout
-                await page.wait_for_selector(".file-item", timeout=20000)
-
-                # Scroll to bottom to load lazy elements
-                last_height = await page.evaluate("() => document.body.scrollHeight")
-                while True:
-                    await page.evaluate("() => window.scrollTo(0, document.body.scrollHeight)")
+                # Scroll to bottom a few times in case of lazy loading
+                for _ in range(5):
+                    await page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
                     await asyncio.sleep(1)
-                    new_height = await page.evaluate("() => document.body.scrollHeight")
-                    if new_height == last_height:
-                        break
-                    last_height = new_height
 
-                # Fetch all file items
                 file_items = await page.query_selector_all(".file-item")
+                print(f"[DEBUG] Found {len(file_items)} fixes")  # DEBUG
+
                 for item in file_items:
                     name_el = await item.query_selector(".file-name")
                     size_el = await item.query_selector(".file-size")
@@ -132,8 +127,8 @@ class GameMonitor:
 
                 await browser.close()
 
-                # Save to cache JSON
-                self.save_fixes_cache(fixes)
+            # Save to cache JSON
+            self.save_fixes_cache(fixes)
 
         except Exception as e:
             print("[ERROR] Playwright scrape failed:", e)
