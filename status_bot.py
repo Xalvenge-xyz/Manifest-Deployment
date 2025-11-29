@@ -82,6 +82,7 @@ class StatusMonitor:
             status_text = self.fetch_status()
             remaining = CHECK_INTERVAL
 
+            file = discord.File(local_gif_path, filename=os.path.basename(local_gif_path))
             embed = Embed(
                 title="🔔 Real-Time Status",
                 description=status_text,
@@ -91,7 +92,7 @@ class StatusMonitor:
             embed.set_footer(text=f"Next update in {remaining // 60:02d}:{remaining % 60:02d}")
 
             # SEND ONCE: embed + file together
-            msg = await channel.send(embed=embed, file=discord.File(local_gif_path))
+            msg = await channel.send(embed=embed, file=file)
 
 
         except discord.errors.Forbidden:
