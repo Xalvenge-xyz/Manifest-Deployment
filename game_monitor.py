@@ -635,65 +635,55 @@ def create_updategame_command(monitor: GameMonitor):
 def create_fixegame_command(monitor: GameMonitor):
     async def fixegame(interaction: discord.Interaction):
         """
-        Fetch all fixes via Playwright first; fallback to HTML parser if Playwright fails.
+        Show fixes per game in professional embeds with banner and download button.
         """
-        await interaction.response.defer()  # public
+        await interaction.response.defer(ephemeral=False)  # public
 
-        # Try Playwright first
+        # Fetch fixes
         fixes = await monitor.scrape_fixes_with_playwright()
         if not fixes:
-            # fallback to HTML parsing
             fixes = await monitor.fetch_fixes()
 
         if not fixes:
             await interaction.followup.send("❌ Failed to load fixes.", ephemeral=True)
             return
 
-        # path to default local banner
+        # Default banner
         default_banner = "img/giphy.gif"
 
-        # prepare text lines
-        lines = []
+        sent_count = 0
         for f in fixes:
-            title = f.get("title")
+            game_title = f.get("title")  # game/fix title
             download = f.get("download")
             size = f.get("size", "")
-            line = f"● **{title}** — [Download]({download}){' • Size: ' + size if size else ''}"
-            lines.append(line)
 
-        # split into chunks (max 25 lines per embed is safe)
-        chunk_size = 25
-        chunks = [lines[i:i + chunk_size] for i in range(0, len(lines), chunk_size)]
-
-        embeds = []
-        for idx, chunk in enumerate(chunks, start=1):
-            embed = discord.Embed(
-                title=f"🛠️ Fixes — Page {idx}/{len(chunks)}",
-                description="\n".join(chunk),
-                color=discord.Color.green()
+            # Embed per game
+            embed = Embed(
+                title=f"🛠️ Fix for {game_title}",
+                description=f"📥 [Download ZIP]({download})\n{('• Size: ' + size) if size else ''}",
+                color=Color.green()
             )
-            embed.set_footer(text="Steam Manifest Bot • XALVENGE D.")
-            if default_banner:
-                embed.set_image(url=f"attachment://{default_banner}")
-            embeds.append(embed)
+            embed.set_image(url=default_banner)
+            embed.set_footer(text="Fix posted by Steam Manifest Bot • XALVENGE D.")
 
-        # send first embed
-        msg = await interaction.followup.send(embed=embeds[0])
-        msg = await msg.fetch()
+            # Send to configured "Fixed Games" channel
+            ch_id = monitor.config.get("channel_id_fixed")
+            if ch_id:
+                await monitor.safe_send(ch_id, embed, local_file=default_banner)
+            else:
+                await interaction.followup.send(embed=embed)
 
-        # sequentially edit message for subsequent pages
-        for embed in embeds[1:]:
-            await asyncio.sleep(2)
-            try:
-                await msg.edit(embed=embed)
-            except Exception as e:
-                print("[ERROR] Failed to edit message:", e)
+            sent_count += 1
+            await asyncio.sleep(0.5)  # avoid rate-limit
+
+        await interaction.followup.send(f"✅ {sent_count} fixes displayed.", ephemeral=True)
 
     return app_commands.Command(
         name="fixegame",
-        description="Show current fixed games (does not modify automatic seen sets)",
+        description="Show current fixes per game with professional embeds",
         callback=fixegame
     )
+
 
 def create_gamesearch_command(monitor):
     @app_commands.command(name="gamesearch", description="Search games by title or App ID")
